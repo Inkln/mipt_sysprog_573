@@ -1,0 +1,5 @@
+2 echo 'i am first, delay = 2'
+6 echo 'i am third, delay = 6'
+3 echo 'i am second, delay = 3'
+7 wtseffsdf
+2 echo 'i am first too, delay 1'
