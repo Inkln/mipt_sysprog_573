@@ -28,6 +28,12 @@
 #define TY_FT_REVERSE   		"\x1b[7m"
 
 #define SET_FONT(X) printf(X)
+#define printf_color(color, ...) \
+	{ \
+		SET_FONT(color); \
+		printf(__VA_ARGS__); \
+		SET_FONT(TY_FT_DEFAULT); \
+	}
 
 // LOG MACRO
 #if defined(DEBUG)
@@ -118,4 +124,5 @@
 			} \
 		}
 
+//#define FONT qsort_time*=1.6
 #endif // DEBUG_H_INCLUDED
