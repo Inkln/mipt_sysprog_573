@@ -11,6 +11,7 @@
 #include <sys/msg.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/time.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -123,8 +124,8 @@ int sort_process(int shm_id, int shm_size, int begin_index, int end_index)
 	else
 		log("shared memory was attached to sort process");
 
-    //qsort(shared_memory + begin_index, end_index - begin_index, sizeof(int), cmp_int);
-	my_qsort(shared_memory + begin_index, end_index - begin_index);
+    qsort(shared_memory + begin_index, end_index - begin_index, sizeof(int), cmp_int);
+	//my_qsort(shared_memory + begin_index, end_index - begin_index);
 
 sort_free_section:
 	// detach shared_memory
@@ -214,8 +215,6 @@ int core(int argc, char** argv)
 	int opt_threads = 1;
 	int opt_max = 100;
 	int opt = 0;
-	double sort_time = clock();
-
 
 	while (( opt = getopt(argc, argv, "s:t:m:")) != -1 ) {
 		if (opt == 's') {
@@ -289,6 +288,11 @@ int core(int argc, char** argv)
 	if (opt_threads * step < opt_size)
 		step++;
 
+	struct timeval tv_start, tv_end;
+    if (gettimeofday(&tv_start, NULL) == -1) {
+		PERROR("time error");
+    }
+
 	pid_t* childs_id = (pid_t*) calloc (sizeof(pid_t), opt_size + 1);
 
 	for (int i = 0; i < opt_threads; i++) {
@@ -305,7 +309,7 @@ int core(int argc, char** argv)
 		}
 	}
 
-	for (int i = 0; i < opt_size; i++) {
+	for (int i = 0; i < opt_threads; i++) {
         int status = 0;
         pid_t process = wait(&status);
         if (process != -1)
@@ -317,7 +321,22 @@ int core(int argc, char** argv)
 				log ("process with id = %d finished with status %d", (int)process, (int)WEXITSTATUS(status));
 			}
 	}
-	sort_time = (clock() - sort_time) / CLOCKS_PER_SEC;
+
+	if (gettimeofday(&tv_end, NULL)) {
+        PERROR("stop time error")
+	}
+    else {
+        tv_end.tv_sec -= tv_start.tv_sec;
+        tv_end.tv_usec -= tv_start.tv_usec;
+        if (tv_end.tv_usec < 0) {
+            tv_end.tv_sec -= 1;
+            tv_end.tv_usec += 1000000;
+        }
+    }
+
+
+	double sort_time = (double)tv_end.tv_sec + (double)tv_end.tv_usec / 1000000 ;
+
 	double merge_time = clock();
 	merge(shared_memory, opt_size, step);
 	merge_time = (clock() - merge_time) / CLOCKS_PER_SEC;
@@ -335,12 +354,13 @@ int core(int argc, char** argv)
     }
 
     if (res) {
-		printf_color(CL_FT_GREEN, "OK\n");
+		printf_color(CL_FT_GREEN, "OK    : ");
     }
     else {
-		printf_color(CL_FT_RED, "FAILED\n");
+		printf_color(CL_FT_RED, "FAILED: ");
     }
-    printf("time=%lg (sort=%lg, merge=%lg), qtime=%lg\n", sort_time + merge_time, sort_time, merge_time, qsort_time);
+	printf("threads: %d | psort: %5.05lg | merge: %5.05lg | total: %5.05lg | qsort: %5.05lg | qsort/psort: %5.05lg\n",
+								opt_threads, sort_time, merge_time, sort_time + merge_time, qsort_time, qsort_time / sort_time);
 
 	/////////////////////////////////////////////////////////////////
 main_free_section:
